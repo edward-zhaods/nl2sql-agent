@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from data.seed_demo_db import DB_PATH, seed
+from data.seed_demo_db import DB_PATH, N_USERS, seed
 from src.agent.executor import Executor
 from src.agent.generator import GenerationError, SQLGenerator, _parse_json_object
 from src.agent.guard import SQLGuard
@@ -92,7 +92,7 @@ def test_happy_path_preview_and_execute(env):
     assert "LIMIT" in preview.sql.upper()          # 守卫注入了 LIMIT
     outcome = pipeline.execute_confirmed(preview.sql)
     assert outcome.success
-    assert outcome.result.rows == [[50]]
+    assert outcome.result.rows == [[N_USERS]]
     assert not outcome.repaired
 
 
@@ -122,7 +122,7 @@ def test_self_repair_loop_fixes_bad_column(env):
     )
     assert outcome.success
     assert outcome.repaired and outcome.attempts == 1
-    assert outcome.result.rows == [[50]]
+    assert outcome.result.rows == [[N_USERS]]
     # 修复调用收到了数据库报错
     assert "wrong_col" in llm.calls[0][-1]["content"]
 

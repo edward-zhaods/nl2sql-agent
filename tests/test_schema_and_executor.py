@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from data.seed_demo_db import DB_PATH, seed
+from data.seed_demo_db import BUSINESS_TABLES as _BUSINESS_TABLES, DB_PATH, N_USERS, seed
 from src.agent.executor import ExecutionError, Executor, ExecResult
 from src.agent.schema_provider import load_catalog
 from src.config import DatabaseConfig, SchemaSourceConfig, SecurityConfig
 
-BUSINESS_TABLES = {"users", "products", "orders", "order_items"}
+BUSINESS_TABLES = set(_BUSINESS_TABLES)
 
 
 @pytest.fixture(scope="session")
@@ -63,7 +63,7 @@ def executor(db_cfg, security) -> Executor:
 def test_simple_query(executor):
     result: ExecResult = executor.execute("SELECT COUNT(*) AS n FROM users")
     assert result.columns == ["n"]
-    assert result.rows == [[50]]
+    assert result.rows == [[N_USERS]]
     assert not result.truncated
 
 
