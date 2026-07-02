@@ -1,0 +1,33 @@
+# NL2SQL Agent 示例配置 —— 可直接运行（配合仓库自带的 SQLite 演示库）
+# 各字段说明见 README「配置说明」章节
+
+llm:
+  base_url: "https://integrate.api.nvidia.com/v1"
+  model: "z-ai/glm-5.1"            # 备选：deepseek-ai/deepseek-v3.2
+  api_key_env: "NVIDIA_API_KEY"    # 只存环境变量名，密钥本体放 .env
+  temperature: 0.2
+  max_tokens: 2048
+
+database:
+  type: sqlite                     # sqlite | mysql | postgresql
+  path: "./data/demo.db"
+  # url: "postgresql://readonly_user:PASSWORD@host:5432/db"  # MySQL/PG 用连接串，务必使用只读账号
+
+schema:
+  source: introspect               # introspect（数据库自省）| ddl（解析 DDL 文件）
+  ddl_path: "./data/schema.sql"
+
+security:
+  allowed_statements: ["SELECT"]
+  max_rows: 500                    # 强制 LIMIT 上限（无 LIMIT 注入；有 LIMIT 则取 min）
+  blocked_tables: ["users_password"]
+  allowed_tables: []               # 非空则切换为白名单模式
+  blocked_functions: ["load_extension", "pg_sleep"]
+  statement_timeout_ms: 5000
+
+agent:
+  max_repair_attempts: 2           # 执行报错后回喂重试次数（每次重试重新过安全校验）
+  schema_linking: false            # 表很多时开启：先让 LLM 选相关表，再生成 SQL
+
+ui:
+  require_confirm_before_execute: true
