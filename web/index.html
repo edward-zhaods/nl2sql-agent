@@ -4,120 +4,322 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NL2SQL Agent · 自然语言查询助手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+  /* 设计系统：Developer Tool / IDE 暗色主题（源自 ui-ux-pro-max skill）
+     配色 slate + indigo，字体 Inter + JetBrains Mono */
   :root {
-    --bg: #f6f7f9; --card: #ffffff; --border: #e3e6ea;
-    --text: #1c2330; --muted: #6b7684; --primary: #2563eb;
-    --primary-dark: #1d4ed8; --danger-bg: #fef2f2; --danger-border: #fca5a5;
-    --danger-text: #b91c1c; --ok: #16a34a; --code-bg: #0f172a; --code-text: #e2e8f0;
+    --primary: #6366F1;
+    --primary-2: #818CF8;
+    --primary-soft: rgba(99,102,241,.14);
+    --accent: #F59E0B;
+    --success: #10B981;
+    --success-soft: rgba(16,185,129,.14);
+    --danger: #EF4444;
+    --danger-soft: rgba(239,68,68,.12);
+    --danger-border: rgba(239,68,68,.4);
+
+    --bg: #0B1120;           /* 页面底 */
+    --bg-2: #0F172A;         /* 次级底 */
+    --card: #1E293B;         /* 卡片 */
+    --card-2: #273549;       /* 卡片内嵌 */
+    --border: #2A3A52;       /* 边框（比 card 亮，可见） */
+    --border-soft: #1E293B;
+
+    --fg: #F1F5F9;           /* 主文字 */
+    --fg-2: #CBD5E1;         /* 次文字 */
+    --muted: #94A3B8;        /* 弱文字 */
+    --muted-2: #64748B;      /* 更弱 */
+
+    --code-bg: #0B1120;
+    --code-fg: #E2E8F0;
+
+    --radius: 14px;
+    --radius-sm: 9px;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    --shadow-primary: 0 6px 20px -6px rgba(99,102,241,.5);
+    --ring: 0 0 0 3px rgba(99,102,241,.25);
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   }
-  * { box-sizing: border-box; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: var(--bg); color: var(--text); min-height: 100vh;
+    font-family: var(--font);
+    color: var(--fg);
+    background: var(--bg);
+    background-image:
+      radial-gradient(900px 480px at 100% -8%, rgba(99,102,241,.12), transparent 60%),
+      radial-gradient(760px 420px at -6% 0%, rgba(139,92,246,.10), transparent 55%);
+    background-attachment: fixed;
+    min-height: 100vh; font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* 顶栏 */
   header {
-    background: var(--card); border-bottom: 1px solid var(--border);
-    padding: 14px 24px; display: flex; align-items: baseline; gap: 14px;
+    background: rgba(15,23,42,.72);
+    backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 13px 26px; display: flex; align-items: center; gap: 13px;
+    position: sticky; top: 0; z-index: 20;
   }
-  header h1 { font-size: 18px; }
-  header .meta { color: var(--muted); font-size: 12px; }
-  .layout { display: flex; gap: 16px; padding: 16px 24px; max-width: 1280px; margin: 0 auto; }
+  .logo {
+    width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--primary) 0%, #A855F7 100%);
+    display: grid; place-items: center; color: #fff; box-shadow: var(--shadow-primary);
+  }
+  .logo svg { width: 19px; height: 19px; }
+  .brand h1 { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+  .brand .sub { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .cfg-pills { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .pill {
+    font-size: 11.5px; font-weight: 500; color: var(--fg-2);
+    background: var(--card); border: 1px solid var(--border);
+    padding: 4px 11px; border-radius: 999px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--success);
+            box-shadow: 0 0 6px var(--success); }
+
+  /* 布局 */
+  .layout { display: flex; gap: 20px; padding: 24px 26px; max-width: 1380px; margin: 0 auto; align-items: flex-start; }
   aside {
-    width: 240px; flex-shrink: 0; background: var(--card);
-    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
-    align-self: flex-start; max-height: 80vh; overflow-y: auto;
+    width: 258px; flex-shrink: 0; background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
+    box-shadow: var(--shadow);
+    position: sticky; top: 86px; max-height: calc(100vh - 112px); overflow-y: auto;
   }
-  aside h2 { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
-  .tbl { margin-bottom: 6px; }
-  .tbl summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 2px; }
-  .tbl .col { font-size: 12px; color: var(--muted); padding: 1px 0 1px 16px; font-family: ui-monospace, monospace; }
-  main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  aside h2 {
+    font-size: 10.5px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .1em; font-weight: 600; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  aside h2 svg { width: 13px; height: 13px; }
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+
+  /* Schema 侧栏 */
+  .tbl { margin-bottom: 2px; }
+  .tbl > summary {
+    cursor: pointer; font-size: 13px; font-weight: 600; color: var(--fg);
+    padding: 7px 8px; border-radius: 7px; list-style: none;
+    display: flex; align-items: center; gap: 8px; transition: background .15s;
+  }
+  .tbl > summary::-webkit-details-marker { display: none; }
+  .tbl > summary::before {
+    content: ""; width: 14px; height: 14px; flex-shrink: 0; background: var(--primary);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cellipse cx='12' cy='5' rx='9' ry='3'/%3E%3Cpath d='M3 5v14a9 3 0 0 0 18 0V5'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cellipse cx='12' cy='5' rx='9' ry='3'/%3E%3Cpath d='M3 5v14a9 3 0 0 0 18 0V5'/%3E%3C/svg%3E") center/contain no-repeat;
+  }
+  .tbl > summary:hover { background: var(--primary-soft); }
+  .tbl .col {
+    font-size: 12px; color: var(--fg-2); padding: 3px 0 3px 30px;
+    font-family: var(--mono); display: flex; gap: 8px; align-items: baseline;
+  }
+  .tbl .col span { color: var(--muted-2); font-size: 10.5px; text-transform: uppercase; }
+
+  /* 卡片 */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+    animation: fadeIn .25s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  h3 {
+    font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--fg);
+    display: flex; align-items: center; gap: 8px;
+  }
+  h3 svg { width: 16px; height: 16px; color: var(--primary-2); }
+
+  /* 输入区 */
   textarea {
-    width: 100%; border: 1px solid var(--border); border-radius: 8px;
-    padding: 10px 12px; font-size: 14px; font-family: inherit; resize: vertical;
-    min-height: 64px; outline: none;
+    width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    padding: 13px 15px; font-size: 15px; font-family: inherit; color: var(--fg);
+    resize: vertical; min-height: 74px; outline: none; background: var(--bg-2);
+    transition: border-color .15s, box-shadow .15s;
   }
-  textarea:focus { border-color: var(--primary); }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  textarea::placeholder { color: var(--muted-2); }
+  textarea:focus { border-color: var(--primary); box-shadow: var(--ring); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   .chip {
-    font-size: 12px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
-    background: #eef2ff; color: var(--primary-dark); border: 1px solid #dbe3ff;
+    font-size: 12.5px; font-weight: 500; padding: 6px 13px; border-radius: 999px;
+    cursor: pointer; background: var(--primary-soft); color: var(--primary-2);
+    border: 1px solid transparent; transition: all .15s; user-select: none;
   }
-  .chip.attack { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
-  .row { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+  .chip:hover { border-color: var(--primary); background: var(--card-2); }
+  .chip.attack { background: var(--danger-soft); color: #F87171; }
+  .chip.attack:hover { border-color: var(--danger-border); }
+
+  .row { display: flex; gap: 10px; margin-top: 16px; align-items: center; }
+
+  /* 按钮 */
   button {
-    border: none; border-radius: 8px; padding: 9px 18px; font-size: 14px;
-    cursor: pointer; background: var(--primary); color: #fff; font-family: inherit;
+    border: none; border-radius: var(--radius-sm); padding: 10px 20px;
+    font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: transform .12s, box-shadow .2s, background .2s; color: #fff;
   }
-  button:hover { background: var(--primary-dark); }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  button.secondary { background: #eef1f5; color: var(--text); }
-  button.confirm { background: var(--ok); }
+  button:active { transform: translateY(1px); }
+  button:not(.secondary):not(.confirm) {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark, #4F46E5) 100%);
+    box-shadow: var(--shadow-primary);
+  }
+  button:not(.secondary):not(.confirm):hover { box-shadow: 0 8px 22px -5px rgba(99,102,241,.6); }
+  button.confirm { background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+                   box-shadow: 0 6px 18px -5px rgba(16,185,129,.5); }
+  button.secondary { background: var(--card-2); color: var(--fg-2); border: 1px solid var(--border); }
+  button.secondary:hover { background: #31425a; }
+  button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+  button svg { width: 15px; height: 15px; }
+
+  /* SQL 代码块 */
   pre.sql {
-    background: var(--code-bg); color: var(--code-text); border-radius: 8px;
-    padding: 12px 14px; font-size: 13px; overflow-x: auto; line-height: 1.55;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap;
+    background: var(--code-bg); color: var(--code-fg); border-radius: var(--radius-sm);
+    padding: 15px 17px; font-size: 13px; overflow-x: auto; line-height: 1.6;
+    font-family: var(--mono); white-space: pre-wrap; word-break: break-word;
+    border: 1px solid var(--border);
   }
-  .explain { color: var(--muted); font-size: 13px; margin: 10px 0 0; line-height: 1.6; }
+  .explain { color: var(--fg-2); font-size: 13.5px; margin-top: 12px; line-height: 1.65; }
+  .explain code { background: var(--bg-2); border: 1px solid var(--border); border-radius: 5px;
+                  padding: 1px 6px; font-family: var(--mono); font-size: 12px; color: var(--primary-2); }
+
+  /* 拦截横幅 */
   .banner {
-    background: var(--danger-bg); border: 1px solid var(--danger-border);
-    color: var(--danger-text); border-radius: 8px; padding: 12px 14px; font-size: 13px;
+    background: var(--danger-soft); border: 1px solid var(--danger-border); color: #FCA5A5;
+    border-radius: var(--radius-sm); padding: 14px 16px; font-size: 13px; line-height: 1.6;
+    margin-top: 12px; display: flex; gap: 11px; align-items: flex-start;
   }
-  .banner b { display: block; margin-bottom: 4px; }
-  .steps { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
-  .step { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
-  .step .ok { color: var(--ok); } .step .fail { color: var(--danger-text); }
-  .result-meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; align-items: center; }
+  .banner::before {
+    content: ""; width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat;
+  }
+  .banner b { display: block; margin-bottom: 3px; font-weight: 600; color: #FECACA; }
+  .banner .body { min-width: 0; }
+
+  /* 步骤轨迹 */
+  .steps {
+    display: flex; flex-direction: column; gap: 0; margin: 14px 0 0 7px;
+    border-left: 2px solid var(--border); padding: 2px 0;
+  }
+  .step {
+    font-size: 12px; color: var(--fg-2); font-family: var(--mono);
+    padding: 5px 0 5px 16px; position: relative; line-height: 1.5; word-break: break-word;
+  }
+  .step::before {
+    content: ""; position: absolute; left: -5px; top: 9px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--muted-2); box-shadow: 0 0 0 3px var(--card);
+  }
+  .step.ok::before { background: var(--success); }
+  .step.fail::before { background: var(--danger); }
+  .step .tag { font-weight: 600; color: var(--fg); font-family: var(--font); }
+  /* 兼容旧结构：span.ok / span.fail */
+  .step .ok { color: var(--success); } .step .fail { color: var(--danger); }
+
+  /* 结果区 */
+  .result-meta {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    font-size: 12.5px; color: var(--fg-2); font-weight: 500;
+  }
+  .result-meta .count { color: var(--fg); font-weight: 600; }
   .badge {
-    background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;
-    padding: 1px 8px; border-radius: 999px; font-size: 11px;
+    background: rgba(245,158,11,.15); color: #FBBF24; border: 1px solid rgba(245,158,11,.4);
+    padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 500;
   }
-  .table-wrap { overflow-x: auto; margin-top: 10px; max-height: 55vh; overflow-y: auto; }
+  .badge.repair { background: var(--primary-soft); color: var(--primary-2); border-color: rgba(99,102,241,.4); }
+  .table-wrap {
+    overflow: auto; margin-top: 14px; max-height: 56vh;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+  }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
-  th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; white-space: nowrap; }
-  th { background: #f1f4f8; position: sticky; top: 0; font-weight: 600; }
-  tr:nth-child(even) td { background: #fafbfc; }
-  .spinner { color: var(--muted); font-size: 13px; }
+  th, td { padding: 9px 14px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border-soft); }
+  th {
+    background: var(--bg-2); position: sticky; top: 0; z-index: 1; color: var(--muted);
+    font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em;
+    border-bottom: 1px solid var(--border);
+  }
+  td { color: var(--fg); font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12.5px; }
+  tbody tr { transition: background .1s; }
+  tbody tr:hover td { background: rgba(99,102,241,.08); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* spinner */
+  .spinner { color: var(--muted); font-size: 13px; display: inline-flex; align-items: center; gap: 9px; }
+  .spinner::before {
+    content: ""; width: 15px; height: 15px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--primary); animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .hidden { display: none; }
-  h3 { font-size: 14px; margin-bottom: 10px; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; border: 2px solid var(--card); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+
+  @media (max-width: 860px) {
+    .layout { flex-direction: column; padding: 16px; }
+    aside { width: 100%; position: static; max-height: 240px; }
+    .cfg-pills { display: none; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>NL2SQL Agent</h1>
-  <span class="meta" id="cfg-meta">加载中…</span>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>
+    </svg>
+  </div>
+  <div class="brand">
+    <h1>NL2SQL Agent</h1>
+    <span class="sub">自然语言 · 智能查询助手</span>
+  </div>
+  <div class="cfg-pills" id="cfg-meta"></div>
 </header>
 
 <div class="layout">
   <aside>
-    <h2>数据库 Schema</h2>
+    <h2>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/></svg>
+      数据库 Schema
+    </h2>
     <div id="schema"></div>
   </aside>
 
   <main>
     <div class="card">
-      <textarea id="question" placeholder="用自然语言描述你想查的数据，例如：最近30天每天的订单数和总金额"></textarea>
+      <textarea id="question" placeholder="用自然语言描述你想查的数据，例如：最近 30 天每天的订单数和总金额"></textarea>
       <div class="chips" id="chips">
         <span class="chip">各城市的用户数量是多少？按数量从多到少排</span>
         <span class="chip">已支付订单中，销售额最高的5个商品是什么？</span>
         <span class="chip">最近30天每天的订单数和总金额</span>
-        <span class="chip attack" id="attack-demo">⚠ 注入攻击演示（直接向执行接口发危险 SQL）</span>
+        <span class="chip attack" id="attack-demo">注入攻击演示（直接向执行接口发危险 SQL）</span>
       </div>
       <div class="row">
-        <button id="btn-generate">生成 SQL</button>
+        <button id="btn-generate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4"/><path d="M13 3l3.5 8.5L21 13l-8.5 3.5L11 21l-3.5-8.5L3 11z"/></svg>
+          生成 SQL
+        </button>
         <span class="spinner hidden" id="gen-spinner">Agent 正在生成 SQL…</span>
       </div>
     </div>
 
     <div class="card hidden" id="preview-card">
-      <h3>SQL 预览 <span style="font-weight:400;color:var(--muted);font-size:12px">（确认后才会执行，执行前服务端会再次安全校验）</span></h3>
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        SQL 预览 <span style="font-weight:400;color:var(--muted);font-size:12px">（确认后才会执行，执行前服务端会再次安全校验）</span>
+      </h3>
       <div id="preview-body"></div>
     </div>
 
     <div class="card hidden" id="result-card">
-      <h3>查询结果</h3>
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg>
+        查询结果
+      </h3>
       <div id="result-body"></div>
     </div>
   </main>
@@ -144,7 +346,7 @@ function renderSteps(steps) {
   if (!steps?.length) return "";
   const label = { generate: "生成", guard: "安全校验", execute: "执行", repair: "自修复" };
   return '<div class="steps">' + steps.map((s) =>
-    `<div class="step"><span class="${s.ok ? "ok" : "fail"}">${s.ok ? "✓" : "✗"}</span> ${label[s.name] || s.name}：${esc(s.detail)}</div>`
+    `<div class="step ${s.ok ? "ok" : "fail"}"><span class="tag">${label[s.name] || s.name}</span> ${esc(s.detail)}</div>`
   ).join("") + "</div>";
 }
 
@@ -152,15 +354,19 @@ function renderSteps(steps) {
 (async () => {
   try {
     const cfg = await (await api("/config")).json();
-    $("cfg-meta").textContent =
-      `模型 ${cfg.model} · 数据库 ${cfg.database_type} · 仅允许 ${cfg.allowed_statements.join("/")} · 最多返回 ${cfg.max_rows} 行`;
+    $("cfg-meta").innerHTML = [
+      `模型 ${esc(cfg.model)}`,
+      `${esc(cfg.database_type)}`,
+      `仅允许 ${esc(cfg.allowed_statements.join("/"))}`,
+      `上限 ${esc(cfg.max_rows)} 行`,
+    ].map((t) => `<span class="pill"><i></i>${t}</span>`).join("");
     const schema = await (await api("/schema")).json();
     $("schema").innerHTML = schema.tables.map((t) =>
       `<details class="tbl" open><summary>${esc(t.name)}</summary>` +
-      t.columns.map((c) => `<div class="col">${esc(c.name)} <span style="opacity:.6">${esc(c.type)}</span></div>`).join("") +
+      t.columns.map((c) => `<div class="col">${esc(c.name)} <span>${esc(c.type)}</span></div>`).join("") +
       "</details>"
     ).join("");
-  } catch (e) { $("cfg-meta").textContent = "初始化失败：" + e.message; }
+  } catch (e) { $("cfg-meta").innerHTML = `<span class="pill">初始化失败：${esc(e.message)}</span>`; }
 })();
 
 // ---------------- 第一段：生成预览 ----------------
@@ -176,7 +382,7 @@ $("btn-generate").onclick = async () => {
     if (!preview.ok) {
       $("preview-body").innerHTML =
         (preview.sql ? `<pre class="sql">${esc(preview.sql)}</pre>` : "") +
-        `<div class="banner" style="margin-top:10px"><b>已被安全守卫拦截</b>${esc(preview.blocked_reason)}</div>` +
+        `<div class="banner"><div class="body"><b>已被安全守卫拦截</b>${esc(preview.blocked_reason)}</div></div>` +
         renderSteps(preview.steps);
       return;
     }
@@ -185,13 +391,15 @@ $("btn-generate").onclick = async () => {
       `<p class="explain">💡 ${esc(preview.explanation)}</p>` +
       (preview.assumptions?.length ? `<p class="explain">假设：${esc(preview.assumptions.join("；"))}</p>` : "") +
       renderSteps(preview.steps) +
-      `<div class="row"><button class="confirm" id="btn-execute">确认执行</button>
+      `<div class="row"><button class="confirm" id="btn-execute">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+         确认执行</button>
        <button class="secondary" id="btn-cancel">取消</button></div>`;
     $("btn-execute").onclick = () => executeSql(preview.sql, question);
     $("btn-cancel").onclick = () => $("preview-card").classList.add("hidden");
   } catch (e) {
     $("preview-card").classList.remove("hidden");
-    $("preview-body").innerHTML = `<div class="banner"><b>请求失败</b>${esc(e.message)}</div>`;
+    $("preview-body").innerHTML = `<div class="banner"><div class="body"><b>请求失败</b>${esc(e.message)}</div></div>`;
   } finally {
     $("btn-generate").disabled = false; $("gen-spinner").classList.add("hidden");
   }
@@ -205,7 +413,7 @@ async function executeSql(sql, question) {
     const outcome = await (await api("/query/execute", { sql, question })).json();
     if (!outcome.success) {
       $("result-body").innerHTML =
-        `<div class="banner"><b>执行失败${outcome.error?.startsWith("[R") ? "：已被安全守卫拦截" : ""}</b>${esc(outcome.error)}</div>` +
+        `<div class="banner"><div class="body"><b>执行失败${outcome.error?.startsWith("[R") ? "：已被安全守卫拦截" : ""}</b>${esc(outcome.error)}</div></div>` +
         renderSteps(outcome.steps);
       return;
     }
@@ -213,12 +421,14 @@ async function executeSql(sql, question) {
     current.sql = outcome.sql;   // 自修复后以实际执行的 SQL 为准（导出用）
     $("result-body").innerHTML =
       `<div class="result-meta">
-         <span>${r.row_count} 行 · ${r.elapsed_ms}ms</span>
+         <span class="count">${r.row_count} 行</span><span>· ${r.elapsed_ms}ms</span>
          ${r.truncated ? '<span class="badge">结果已按上限截断</span>' : ""}
-         ${outcome.repaired ? `<span class="badge">经 ${outcome.attempts} 次自修复</span>` : ""}
-         <button class="secondary" id="btn-export" style="margin-left:auto;padding:5px 12px;font-size:12px">导出 CSV</button>
+         ${outcome.repaired ? `<span class="badge repair">经 ${outcome.attempts} 次自修复</span>` : ""}
+         <button class="secondary" id="btn-export" style="margin-left:auto;padding:6px 13px;font-size:12.5px">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+           导出 CSV</button>
        </div>` +
-      (outcome.repaired ? `<pre class="sql" style="margin-top:10px">${esc(outcome.sql)}</pre>` : "") +
+      (outcome.repaired ? `<pre class="sql" style="margin-top:12px">${esc(outcome.sql)}</pre>` : "") +
       renderSteps(outcome.steps) +
       `<div class="table-wrap"><table>
          <thead><tr>${r.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead>
@@ -226,7 +436,7 @@ async function executeSql(sql, question) {
        </table></div>`;
     $("btn-export").onclick = exportCsv;
   } catch (e) {
-    $("result-body").innerHTML = `<div class="banner"><b>请求失败</b>${esc(e.message)}</div>`;
+    $("result-body").innerHTML = `<div class="banner"><div class="body"><b>请求失败</b>${esc(e.message)}</div></div>`;
   }
 }
 
@@ -255,7 +465,7 @@ async function attackDemo() {
   // 模拟绕过前端、直接向执行接口发送危险 SQL——服务端二次校验应当拦截
   $("preview-card").classList.remove("hidden");
   $("preview-body").innerHTML =
-    `<p class="explain">演示：绕过「生成 → 确认」流程，直接向 /api/query/execute 发送
+    `<p class="explain">演示：绕过「生成 → 确认」流程，直接向 <code>/api/query/execute</code> 发送
      <code>SELECT 1; DROP TABLE users</code>（等同攻击者手工调接口）</p>`;
   await executeSql("SELECT 1; DROP TABLE users", null);
 }
