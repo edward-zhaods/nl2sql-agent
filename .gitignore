@@ -40,3 +40,6 @@ ENV/
 .cache/
 .pytest_cache/
 .ruff_cache/
+
+# 个人学习笔记，不入库
+docs/code-walkthrough.md
