@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NL2SQL Agent · 自然语言查询助手</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --border: #e3e6ea;
+    --text: #1c2330; --muted: #6b7684; --primary: #2563eb;
+    --primary-dark: #1d4ed8; --danger-bg: #fef2f2; --danger-border: #fca5a5;
+    --danger-text: #b91c1c; --ok: #16a34a; --code-bg: #0f172a; --code-text: #e2e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  header {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 14px 24px; display: flex; align-items: baseline; gap: 14px;
+  }
+  header h1 { font-size: 18px; }
+  header .meta { color: var(--muted); font-size: 12px; }
+  .layout { display: flex; gap: 16px; padding: 16px 24px; max-width: 1280px; margin: 0 auto; }
+  aside {
+    width: 240px; flex-shrink: 0; background: var(--card);
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    align-self: flex-start; max-height: 80vh; overflow-y: auto;
+  }
+  aside h2 { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .tbl { margin-bottom: 6px; }
+  .tbl summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 2px; }
+  .tbl .col { font-size: 12px; color: var(--muted); padding: 1px 0 1px 16px; font-family: ui-monospace, monospace; }
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-size: 14px; font-family: inherit; resize: vertical;
+    min-height: 64px; outline: none;
+  }
+  textarea:focus { border-color: var(--primary); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chip {
+    font-size: 12px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+    background: #eef2ff; color: var(--primary-dark); border: 1px solid #dbe3ff;
+  }
+  .chip.attack { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
+  .row { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+  button {
+    border: none; border-radius: 8px; padding: 9px 18px; font-size: 14px;
+    cursor: pointer; background: var(--primary); color: #fff; font-family: inherit;
+  }
+  button:hover { background: var(--primary-dark); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: #eef1f5; color: var(--text); }
+  button.confirm { background: var(--ok); }
+  pre.sql {
+    background: var(--code-bg); color: var(--code-text); border-radius: 8px;
+    padding: 12px 14px; font-size: 13px; overflow-x: auto; line-height: 1.55;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap;
+  }
+  .explain { color: var(--muted); font-size: 13px; margin: 10px 0 0; line-height: 1.6; }
+  .banner {
+    background: var(--danger-bg); border: 1px solid var(--danger-border);
+    color: var(--danger-text); border-radius: 8px; padding: 12px 14px; font-size: 13px;
+  }
+  .banner b { display: block; margin-bottom: 4px; }
+  .steps { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+  .step { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
+  .step .ok { color: var(--ok); } .step .fail { color: var(--danger-text); }
+  .result-meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; align-items: center; }
+  .badge {
+    background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;
+    padding: 1px 8px; border-radius: 999px; font-size: 11px;
+  }
+  .table-wrap { overflow-x: auto; margin-top: 10px; max-height: 55vh; overflow-y: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; white-space: nowrap; }
+  th { background: #f1f4f8; position: sticky; top: 0; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .spinner { color: var(--muted); font-size: 13px; }
+  .hidden { display: none; }
+  h3 { font-size: 14px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NL2SQL Agent</h1>
+  <span class="meta" id="cfg-meta">加载中…</span>
+</header>
+
+<div class="layout">
+  <aside>
+    <h2>数据库 Schema</h2>
+    <div id="schema"></div>
+  </aside>
+
+  <main>
+    <div class="card">
+      <textarea id="question" placeholder="用自然语言描述你想查的数据，例如：最近30天每天的订单数和总金额"></textarea>
+      <div class="chips" id="chips">
+        <span class="chip">各城市的用户数量是多少？按数量从多到少排</span>
+        <span class="chip">已支付订单中，销售额最高的5个商品是什么？</span>
+        <span class="chip">最近30天每天的订单数和总金额</span>
+        <span class="chip attack" id="attack-demo">⚠ 注入攻击演示（直接向执行接口发危险 SQL）</span>
+      </div>
+      <div class="row">
+        <button id="btn-generate">生成 SQL</button>
+        <span class="spinner hidden" id="gen-spinner">Agent 正在生成 SQL…</span>
+      </div>
+    </div>
+
+    <div class="card hidden" id="preview-card">
+      <h3>SQL 预览 <span style="font-weight:400;color:var(--muted);font-size:12px">（确认后才会执行，执行前服务端会再次安全校验）</span></h3>
+      <div id="preview-body"></div>
+    </div>
+
+    <div class="card hidden" id="result-card">
+      <h3>查询结果</h3>
+      <div id="result-body"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let current = { sql: "", question: "" };
+
+async function api(path, body) {
+  const resp = await fetch("/api" + path, body === undefined ? {} : {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  if (!resp.ok && resp.headers.get("content-type")?.includes("json")) {
+    const err = await resp.json();
+    throw new Error(err.detail || resp.statusText);
+  }
+  if (!resp.ok) throw new Error(resp.statusText);
+  return resp;
+}
+
+function renderSteps(steps) {
+  if (!steps?.length) return "";
+  const label = { generate: "生成", guard: "安全校验", execute: "执行", repair: "自修复" };
+  return '<div class="steps">' + steps.map((s) =>
+    `<div class="step"><span class="${s.ok ? "ok" : "fail"}">${s.ok ? "✓" : "✗"}</span> ${label[s.name] || s.name}：${esc(s.detail)}</div>`
+  ).join("") + "</div>";
+}
+
+// ---------------- 初始化：配置摘要 + Schema 侧栏 ----------------
+(async () => {
+  try {
+    const cfg = await (await api("/config")).json();
+    $("cfg-meta").textContent =
+      `模型 ${cfg.model} · 数据库 ${cfg.database_type} · 仅允许 ${cfg.allowed_statements.join("/")} · 最多返回 ${cfg.max_rows} 行`;
+    const schema = await (await api("/schema")).json();
+    $("schema").innerHTML = schema.tables.map((t) =>
+      `<details class="tbl" open><summary>${esc(t.name)}</summary>` +
+      t.columns.map((c) => `<div class="col">${esc(c.name)} <span style="opacity:.6">${esc(c.type)}</span></div>`).join("") +
+      "</details>"
+    ).join("");
+  } catch (e) { $("cfg-meta").textContent = "初始化失败：" + e.message; }
+})();
+
+// ---------------- 第一段：生成预览 ----------------
+$("btn-generate").onclick = async () => {
+  const question = $("question").value.trim();
+  if (!question) return alert("请先输入问题");
+  $("btn-generate").disabled = true; $("gen-spinner").classList.remove("hidden");
+  $("preview-card").classList.add("hidden"); $("result-card").classList.add("hidden");
+  try {
+    const preview = await (await api("/query/generate", { question })).json();
+    current = { sql: preview.sql, question };
+    $("preview-card").classList.remove("hidden");
+    if (!preview.ok) {
+      $("preview-body").innerHTML =
+        (preview.sql ? `<pre class="sql">${esc(preview.sql)}</pre>` : "") +
+        `<div class="banner" style="margin-top:10px"><b>已被安全守卫拦截</b>${esc(preview.blocked_reason)}</div>` +
+        renderSteps(preview.steps);
+      return;
+    }
+    $("preview-body").innerHTML =
+      `<pre class="sql">${esc(preview.sql)}</pre>` +
+      `<p class="explain">💡 ${esc(preview.explanation)}</p>` +
+      (preview.assumptions?.length ? `<p class="explain">假设：${esc(preview.assumptions.join("；"))}</p>` : "") +
+      renderSteps(preview.steps) +
+      `<div class="row"><button class="confirm" id="btn-execute">确认执行</button>
+       <button class="secondary" id="btn-cancel">取消</button></div>`;
+    $("btn-execute").onclick = () => executeSql(preview.sql, question);
+    $("btn-cancel").onclick = () => $("preview-card").classList.add("hidden");
+  } catch (e) {
+    $("preview-card").classList.remove("hidden");
+    $("preview-body").innerHTML = `<div class="banner"><b>请求失败</b>${esc(e.message)}</div>`;
+  } finally {
+    $("btn-generate").disabled = false; $("gen-spinner").classList.add("hidden");
+  }
+};
+
+// ---------------- 第二段：确认执行（含自修复展示） ----------------
+async function executeSql(sql, question) {
+  $("result-card").classList.remove("hidden");
+  $("result-body").innerHTML = '<span class="spinner">执行中…（失败时 Agent 会自动尝试修复）</span>';
+  try {
+    const outcome = await (await api("/query/execute", { sql, question })).json();
+    if (!outcome.success) {
+      $("result-body").innerHTML =
+        `<div class="banner"><b>执行失败${outcome.error?.startsWith("[R") ? "：已被安全守卫拦截" : ""}</b>${esc(outcome.error)}</div>` +
+        renderSteps(outcome.steps);
+      return;
+    }
+    const r = outcome.result;
+    current.sql = outcome.sql;   // 自修复后以实际执行的 SQL 为准（导出用）
+    $("result-body").innerHTML =
+      `<div class="result-meta">
+         <span>${r.row_count} 行 · ${r.elapsed_ms}ms</span>
+         ${r.truncated ? '<span class="badge">结果已按上限截断</span>' : ""}
+         ${outcome.repaired ? `<span class="badge">经 ${outcome.attempts} 次自修复</span>` : ""}
+         <button class="secondary" id="btn-export" style="margin-left:auto;padding:5px 12px;font-size:12px">导出 CSV</button>
+       </div>` +
+      (outcome.repaired ? `<pre class="sql" style="margin-top:10px">${esc(outcome.sql)}</pre>` : "") +
+      renderSteps(outcome.steps) +
+      `<div class="table-wrap"><table>
+         <thead><tr>${r.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+         <tbody>${r.rows.map((row) => `<tr>${row.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody>
+       </table></div>`;
+    $("btn-export").onclick = exportCsv;
+  } catch (e) {
+    $("result-body").innerHTML = `<div class="banner"><b>请求失败</b>${esc(e.message)}</div>`;
+  }
+}
+
+async function exportCsv() {
+  try {
+    const resp = await api("/export/csv", { sql: current.sql });
+    const blob = await resp.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "query_result.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) { alert("导出失败：" + e.message); }
+}
+
+// ---------------- 示例问题 & 注入攻击演示 ----------------
+$("chips").addEventListener("click", (ev) => {
+  if (ev.target.id === "attack-demo") return attackDemo();
+  if (ev.target.classList.contains("chip")) {
+    $("question").value = ev.target.textContent;
+    $("btn-generate").click();
+  }
+});
+
+async function attackDemo() {
+  // 模拟绕过前端、直接向执行接口发送危险 SQL——服务端二次校验应当拦截
+  $("preview-card").classList.remove("hidden");
+  $("preview-body").innerHTML =
+    `<p class="explain">演示：绕过「生成 → 确认」流程，直接向 /api/query/execute 发送
+     <code>SELECT 1; DROP TABLE users</code>（等同攻击者手工调接口）</p>`;
+  await executeSql("SELECT 1; DROP TABLE users", null);
+}
+</script>
+</body>
+</html>
