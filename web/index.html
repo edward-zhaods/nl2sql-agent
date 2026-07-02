@@ -11,36 +11,36 @@
   /* 设计系统：Developer Tool / IDE 暗色主题（源自 ui-ux-pro-max skill）
      配色 slate + indigo，字体 Inter + JetBrains Mono */
   :root {
-    --primary: #6366F1;
-    --primary-2: #818CF8;
-    --primary-soft: rgba(99,102,241,.14);
+    --primary: #16A34A;
+    --primary-2: #15803D;
+    --primary-soft: rgba(22,163,74,.12);
     --accent: #F59E0B;
-    --success: #10B981;
-    --success-soft: rgba(16,185,129,.14);
+    --success: #16A34A;
+    --success-soft: rgba(22,163,74,.12);
     --danger: #EF4444;
-    --danger-soft: rgba(239,68,68,.12);
-    --danger-border: rgba(239,68,68,.4);
+    --danger-soft: rgba(239,68,68,.10);
+    --danger-border: rgba(239,68,68,.35);
 
-    --bg: #0B1120;           /* 页面底 */
-    --bg-2: #0F172A;         /* 次级底 */
-    --card: #1E293B;         /* 卡片 */
-    --card-2: #273549;       /* 卡片内嵌 */
-    --border: #2A3A52;       /* 边框（比 card 亮，可见） */
-    --border-soft: #1E293B;
+    --bg: #EDF7EF;           /* 页面底（淡绿） */
+    --bg-2: #F1FAF3;         /* 次级底 */
+    --card: #FFFFFF;         /* 卡片 */
+    --card-2: #EAF6EC;       /* 卡片内嵌 */
+    --border: #C6E9CE;       /* 边框（淡绿，可见） */
+    --border-soft: #E3F3E7;
 
-    --fg: #F1F5F9;           /* 主文字 */
-    --fg-2: #CBD5E1;         /* 次文字 */
-    --muted: #94A3B8;        /* 弱文字 */
-    --muted-2: #64748B;      /* 更弱 */
+    --fg: #123524;           /* 主文字（深绿） */
+    --fg-2: #3D5C48;         /* 次文字 */
+    --muted: #6B8676;        /* 弱文字 */
+    --muted-2: #94AE9E;      /* 更弱 */
 
-    --code-bg: #0B1120;
-    --code-fg: #E2E8F0;
+    --code-bg: #0E2A1C;      /* 代码块深绿 */
+    --code-fg: #D9F5E3;
 
     --radius: 14px;
     --radius-sm: 9px;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
-    --shadow-primary: 0 6px 20px -6px rgba(99,102,241,.5);
-    --ring: 0 0 0 3px rgba(99,102,241,.25);
+    --shadow: 0 1px 2px rgba(20,60,40,.06), 0 8px 24px -12px rgba(20,60,40,.18);
+    --shadow-primary: 0 6px 18px -6px rgba(22,163,74,.4);
+    --ring: 0 0 0 3px rgba(22,163,74,.2);
     --font: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
     --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   }
@@ -50,8 +50,8 @@
     color: var(--fg);
     background: var(--bg);
     background-image:
-      radial-gradient(900px 480px at 100% -8%, rgba(99,102,241,.12), transparent 60%),
-      radial-gradient(760px 420px at -6% 0%, rgba(139,92,246,.10), transparent 55%);
+      radial-gradient(900px 480px at 100% -8%, rgba(22,163,74,.10), transparent 60%),
+      radial-gradient(760px 420px at -6% 0%, rgba(52,211,153,.10), transparent 55%);
     background-attachment: fixed;
     min-height: 100vh; font-size: 14px; line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -59,7 +59,7 @@
 
   /* 顶栏 */
   header {
-    background: rgba(15,23,42,.72);
+    background: rgba(255,255,255,.75);
     backdrop-filter: saturate(160%) blur(12px);
     border-bottom: 1px solid var(--border);
     padding: 13px 26px; display: flex; align-items: center; gap: 13px;
@@ -67,7 +67,7 @@
   }
   .logo {
     width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
-    background: linear-gradient(135deg, var(--primary) 0%, #A855F7 100%);
+    background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
     display: grid; place-items: center; color: #fff; box-shadow: var(--shadow-primary);
   }
   .logo svg { width: 19px; height: 19px; }
@@ -149,7 +149,7 @@
     border: 1px solid transparent; transition: all .15s; user-select: none;
   }
   .chip:hover { border-color: var(--primary); background: var(--card-2); }
-  .chip.attack { background: var(--danger-soft); color: #F87171; }
+  .chip.attack { background: var(--danger-soft); color: #DC2626; }
   .chip.attack:hover { border-color: var(--danger-border); }
 
   .row { display: flex; gap: 10px; margin-top: 16px; align-items: center; }
@@ -163,10 +163,10 @@
   }
   button:active { transform: translateY(1px); }
   button:not(.secondary):not(.confirm) {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark, #4F46E5) 100%);
+    background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
     box-shadow: var(--shadow-primary);
   }
-  button:not(.secondary):not(.confirm):hover { box-shadow: 0 8px 22px -5px rgba(99,102,241,.6); }
+  button:not(.secondary):not(.confirm):hover { box-shadow: 0 8px 22px -5px rgba(22,163,74,.5); }
   button.confirm { background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
                    box-shadow: 0 6px 18px -5px rgba(16,185,129,.5); }
   button.secondary { background: var(--card-2); color: var(--fg-2); border: 1px solid var(--border); }
@@ -187,7 +187,7 @@
 
   /* 拦截横幅 */
   .banner {
-    background: var(--danger-soft); border: 1px solid var(--danger-border); color: #FCA5A5;
+    background: var(--danger-soft); border: 1px solid var(--danger-border); color: #B91C1C;
     border-radius: var(--radius-sm); padding: 14px 16px; font-size: 13px; line-height: 1.6;
     margin-top: 12px; display: flex; gap: 11px; align-items: flex-start;
   }
@@ -196,7 +196,7 @@
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat;
   }
-  .banner b { display: block; margin-bottom: 3px; font-weight: 600; color: #FECACA; }
+  .banner b { display: block; margin-bottom: 3px; font-weight: 600; color: #991B1B; }
   .banner .body { min-width: 0; }
 
   /* 步骤轨迹 */
@@ -225,10 +225,10 @@
   }
   .result-meta .count { color: var(--fg); font-weight: 600; }
   .badge {
-    background: rgba(245,158,11,.15); color: #FBBF24; border: 1px solid rgba(245,158,11,.4);
+    background: rgba(245,158,11,.14); color: #B45309; border: 1px solid rgba(245,158,11,.4);
     padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 500;
   }
-  .badge.repair { background: var(--primary-soft); color: var(--primary-2); border-color: rgba(99,102,241,.4); }
+  .badge.repair { background: var(--primary-soft); color: var(--primary-2); border-color: rgba(22,163,74,.4); }
   .table-wrap {
     overflow: auto; margin-top: 14px; max-height: 56vh;
     border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -242,7 +242,7 @@
   }
   td { color: var(--fg); font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12.5px; }
   tbody tr { transition: background .1s; }
-  tbody tr:hover td { background: rgba(99,102,241,.08); }
+  tbody tr:hover td { background: rgba(22,163,74,.07); }
   tbody tr:last-child td { border-bottom: none; }
 
   /* spinner */
