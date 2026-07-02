@@ -141,6 +141,7 @@
   }
   textarea::placeholder { color: var(--muted-2); }
   textarea:focus { border-color: var(--primary); box-shadow: var(--ring); }
+  textarea:disabled { opacity: .6; cursor: not-allowed; background: var(--card-2); }
 
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   .chip {
@@ -362,7 +363,7 @@ function renderSteps(steps) {
     ].map((t) => `<span class="pill"><i></i>${t}</span>`).join("");
     const schema = await (await api("/schema")).json();
     $("schema").innerHTML = schema.tables.map((t) =>
-      `<details class="tbl" open><summary>${esc(t.name)}</summary>` +
+      `<details class="tbl"><summary>${esc(t.name)}</summary>` +
       t.columns.map((c) => `<div class="col">${esc(c.name)} <span>${esc(c.type)}</span></div>`).join("") +
       "</details>"
     ).join("");
@@ -373,7 +374,7 @@ function renderSteps(steps) {
 $("btn-generate").onclick = async () => {
   const question = $("question").value.trim();
   if (!question) return alert("请先输入问题");
-  $("btn-generate").disabled = true; $("gen-spinner").classList.remove("hidden");
+  $("btn-generate").disabled = true; $("question").disabled = true; $("gen-spinner").classList.remove("hidden");
   $("preview-card").classList.add("hidden"); $("result-card").classList.add("hidden");
   try {
     const preview = await (await api("/query/generate", { question })).json();
@@ -401,7 +402,7 @@ $("btn-generate").onclick = async () => {
     $("preview-card").classList.remove("hidden");
     $("preview-body").innerHTML = `<div class="banner"><div class="body"><b>请求失败</b>${esc(e.message)}</div></div>`;
   } finally {
-    $("btn-generate").disabled = false; $("gen-spinner").classList.add("hidden");
+    $("btn-generate").disabled = false; $("question").disabled = false; $("gen-spinner").classList.add("hidden");
   }
 };
 
