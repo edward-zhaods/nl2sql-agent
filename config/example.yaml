@@ -3,7 +3,7 @@
 
 llm:
   base_url: "https://integrate.api.nvidia.com/v1"
-  model: "z-ai/glm-5.1"            # 备选：deepseek-ai/deepseek-v3.2
+  model: "deepseek-ai/deepseek-v4-flash"   # 备选：deepseek-ai/deepseek-v4-pro、qwen/qwen3.5-397b-a17b
   api_key_env: "NVIDIA_API_KEY"    # 只存环境变量名，密钥本体放 .env
   temperature: 0.2
   max_tokens: 2048
