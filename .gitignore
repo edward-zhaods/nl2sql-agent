@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Databases (generated demo data is regenerated from scripts)
+*.db
+*.sqlite
+*.sqlite3
+
+# Exported query results
+*.csv
+!config/**/*.csv
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Logs & caches
+*.log
+.cache/
+.pytest_cache/
+.ruff_cache/
