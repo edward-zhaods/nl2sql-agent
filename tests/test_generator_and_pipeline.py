@@ -61,6 +61,16 @@ def test_repair_prompt_includes_error_feedback():
     assert "SELECT bad FROM users" in user_msg
 
 
+def test_system_prompt_defines_recent_days_as_natural_days():
+    llm = FakeLLM([reply("SELECT 1")])
+    gen = SQLGenerator(llm, "sqlite")
+    gen.generate("最近 7 天订单", "schema")
+    system_msg = llm.calls[0][0]["content"]
+    assert "最近 N 天" in system_msg
+    assert "包含今天在内的 N 个自然日" in system_msg
+    assert "DATE('2026-07-03', '-6 days')" in system_msg
+
+
 # ---------------------------------------------------------------- Pipeline
 
 @pytest.fixture(scope="module")

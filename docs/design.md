@@ -154,8 +154,8 @@ sequenceDiagram
 
 通过 OpenAI 兼容协议接入 NVIDIA API Catalog（`https://integrate.api.nvidia.com/v1`），模型可配置：
 
-- `z-ai/glm-5.1`（默认）
-- `deepseek-ai/deepseek-v3.2`（备选，配置一行切换）
+- `z-ai/glm-5.2`（默认）
+- `stepfun-ai/step-3.7-flash` / `deepseek-ai/deepseek-v4-flash` / `mistralai/mistral-medium-3.5-128b`（备选，改 `llm.model` 一行切换）
 
 密钥只从环境变量 `NVIDIA_API_KEY` 读取（`.env` 已 gitignore），配置文件里只写环境变量名，仓库中永不出现明文密钥。客户端封装为独立模块，换任何 OpenAI 兼容供应商（OpenAI、SiliconFlow、Ollama 本地）只需改 `base_url` + `model`。
 
@@ -166,7 +166,7 @@ sequenceDiagram
 ```yaml
 llm:
   base_url: "https://integrate.api.nvidia.com/v1"
-  model: "z-ai/glm-5.1"
+  model: "z-ai/glm-5.2"
   api_key_env: "NVIDIA_API_KEY"   # 只存环境变量名，不存密钥本体
   temperature: 0.2
   max_tokens: 2048

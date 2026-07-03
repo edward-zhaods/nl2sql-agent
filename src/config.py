@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 class LLMConfig(BaseModel):
     base_url: str = "https://integrate.api.nvidia.com/v1"
-    model: str = "z-ai/glm-5.1"
+    model: str = "z-ai/glm-5.2"
     api_key_env: str = "NVIDIA_API_KEY"
     temperature: float = 0.2
     max_tokens: int = 2048

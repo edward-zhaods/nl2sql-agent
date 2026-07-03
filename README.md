@@ -70,7 +70,7 @@ SELECT DATE(created_at) AS day,
        COUNT(*)          AS order_count,
        SUM(total_amount) AS total_amount
 FROM orders
-WHERE created_at >= DATE('now', '-30 days')
+WHERE DATE(created_at) >= DATE('now', '-29 days')
 GROUP BY day
 ORDER BY day
 LIMIT 500;
