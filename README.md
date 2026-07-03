@@ -13,7 +13,7 @@
 python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-# 2. 生成演示数据库（电商场景 13 张表：12 业务表 + 1 敏感表，可重复执行）
+# 2. 生成演示数据库（电商场景 13 张表：12 业务表 + 1 敏感表，1200 笔订单，可重复执行）
 .venv/bin/python data/seed_demo_db.py
 
 # 3. 配置 LLM 密钥（NVIDIA API Catalog，OpenAI 兼容）
@@ -61,7 +61,7 @@ ORDER BY total_sales DESC
 LIMIT 5;
 ```
 
-预期：5 行，首位为「27寸显示器」（总销售额 77940 元）。
+预期：5 行，首位为「27寸显示器」（总销售额 197448 元）。
 
 **③ 时间范围：最近 30 天每天的订单数和总金额**
 
