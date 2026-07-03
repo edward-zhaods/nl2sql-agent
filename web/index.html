@@ -340,7 +340,7 @@ async function api(path, body) {
 
 function renderSteps(steps) {
   if (!steps?.length) return "";
-  const label = { generate: "生成", guard: "安全校验", execute: "执行", repair: "自修复" };
+  const label = { generate: "生成", guard: "安全校验", validate: "语义校验", critic: "AI 审查", execute: "执行", repair: "自修复" };
   return '<div class="steps">' + steps.map((s) =>
     `<div class="step ${s.ok ? "ok" : "fail"}"><span class="tag">${label[s.name] || s.name}</span> ${esc(s.detail)}</div>`
   ).join("") + "</div>";
@@ -417,6 +417,7 @@ function renderPreview(preview, question) {
     `<pre class="sql">${esc(preview.sql)}</pre>` +
     `<p class="explain">💡 ${esc(preview.explanation)}</p>` +
     (preview.assumptions?.length ? `<p class="explain">假设：${esc(preview.assumptions.join("；"))}</p>` : "") +
+    (preview.warnings?.length ? `<p class="explain" style="color:var(--danger)">⚠️ 校验提示：${esc(preview.warnings.join("；"))}</p>` : "") +
     renderSteps(preview.steps) +
     `<div class="row" style="justify-content:flex-end">
        <button class="secondary" id="btn-cancel">取消</button>

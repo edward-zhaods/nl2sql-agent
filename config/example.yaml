@@ -26,8 +26,12 @@ security:
   statement_timeout_ms: 5000
 
 agent:
-  max_repair_attempts: 2           # 执行报错后回喂重试次数（每次重试重新过安全校验）
+  max_repair_attempts: 2           # 执行报错/语义存疑后回喂重试次数（每次重试重新过安全校验）
   schema_linking: false            # 表很多时开启：先让 LLM 选相关表，再生成 SQL
+  enum_injection: true             # 把低基数列的真实取值注入 Schema（如 status 取值: paid, refunded）
+  enum_max_cardinality: 30         # 去重取值数 ≤ 此阈值的列才注入，滤掉自由文本/主键
+  semantic_validation: true        # 确定性语义校验：字面量必须是库里真实枚举值，逮住「已支付」这类幻觉
+  llm_critic: false                # 额外的 LLM 审查 agent（抓 join/聚合等逻辑错），多一次调用，按需开
 
 ui:
   require_confirm_before_execute: true

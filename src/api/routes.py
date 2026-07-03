@@ -48,6 +48,8 @@ def get_config(request: Request):
         "max_rows": cfg.security.max_rows,
         "allowed_statements": cfg.security.allowed_statements,
         "max_repair_attempts": cfg.agent.max_repair_attempts,
+        "semantic_validation": cfg.agent.semantic_validation,
+        "llm_critic": cfg.agent.llm_critic,
         "require_confirm_before_execute": cfg.ui.require_confirm_before_execute,
     }
 

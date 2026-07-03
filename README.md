@@ -2,9 +2,9 @@
 
 > 基调听云 AI 研发工程师实操题 · **题目二**
 
-让业务同学用自然语言查数据库：**理解问题 → 生成 SQL → AST 安全校验 → 用户确认 → 受控执行 → 表格展示/导出 CSV**。执行失败时 Agent 自动带报错重试修复。
+让业务同学用自然语言查数据库：**理解问题 → 生成 SQL → AST 安全校验 → 语义校验 → 用户确认 → 受控执行 → 表格展示/导出 CSV**。语义校验发现枚举值等错误会带反馈自动重生成；执行失败也会带报错重试修复。
 
-![流程](https://img.shields.io/badge/%E6%B5%81%E7%A8%8B-%E7%94%9F%E6%88%90%E2%86%92%E9%A2%84%E8%A7%88%E7%A1%AE%E8%AE%A4%E2%86%92%E6%89%A7%E8%A1%8C-blue) ![测试](https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-53%20passed-brightgreen) ![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab)
+![流程](https://img.shields.io/badge/%E6%B5%81%E7%A8%8B-%E7%94%9F%E6%88%90%E2%86%92%E9%A2%84%E8%A7%88%E7%A1%AE%E8%AE%A4%E2%86%92%E6%89%A7%E8%A1%8C-blue) ![测试](https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-75%20passed-brightgreen) ![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab)
 
 ## 快速开始
 
@@ -105,6 +105,25 @@ SQLGuard 六条规则（任一失败即拦截并给出中文原因）：
 .venv/bin/pytest tests/test_guard_security.py -v
 ```
 
+## 正确性校验（安全之外的一层）
+
+安全守卫只解决「能不能执行」，不解决「答得对不对」。像 `WHERE status = '已支付'`——
+语法合法、过守卫、能执行、**静默返回 0 行**——这类语义错误单靠守卫和「执行报错才重试」
+都逮不住。为此在生成后补了一层正确性校验：
+
+| 层 | 机制 | 作用 |
+|---|---|---|
+| 防（接地） | **Schema 枚举注入** | 自省时对低基数列采样真实取值，写进 Schema（如 `status TEXT -- 取值: paid, refunded`），让模型基于库里的实际枚举写 WHERE，而不是把中文描述当字段值 |
+| 校（确定性） | **SemanticValidator** | 遍历 AST，把 `col = 'x'` / `IN (...)` 的字面量比对封闭枚举集，逮住幻觉值。零 LLM 调用、可单测；只对小枚举强校验，开放型分类（城市、商品名）仅接地不强卡，避免误报 |
+| 校（可选） | **SQLCritic**（LLM 审查 agent） | 抓确定性规则抓不到的逻辑错（连错表、聚合口径、漏条件）。`agent.llm_critic` 开关，默认关 |
+
+发现问题后**复用自修复循环**：把校验反馈当作 error 回喂生成器重生成，产物照样重过守卫；
+用尽重试仍存疑则**不硬拦**（有人工确认兜底），改为在预览里给⚠️警告，避免误杀。
+
+```bash
+.venv/bin/pytest tests/test_validator.py -v          # 枚举注入 + 确定性校验
+```
+
 ## 配置说明（config/example.yaml）
 
 | 字段 | 说明 | 默认 |
@@ -124,7 +143,11 @@ SQLGuard 六条规则（任一失败即拦截并给出中文原因）：
 | `security.allowed_tables` | 表白名单（非空则启用白名单模式） | `[]` |
 | `security.blocked_functions` | 危险函数黑名单 | `load_extension` 等 |
 | `security.statement_timeout_ms` | 语句超时（PG 会话级生效） | `5000` |
-| `agent.max_repair_attempts` | 执行失败自修复重试次数 | `2` |
+| `agent.max_repair_attempts` | 执行失败/语义存疑的自修复重试次数 | `2` |
+| `agent.enum_injection` | 把低基数列真实取值注入 Schema（接地，防幻觉） | `true` |
+| `agent.enum_max_cardinality` | 去重取值 ≤ 此值的列才注入 | `30` |
+| `agent.semantic_validation` | 确定性枚举校验（逮住「已支付」这类幻觉值） | `true` |
+| `agent.llm_critic` | 额外的 LLM 审查 agent（抓 join/聚合逻辑错，多一次调用） | `false` |
 | `ui.require_confirm_before_execute` | 执行前需用户确认 | `true` |
 
 自定义配置：复制 `config/example.yaml` 后修改，用环境变量 `NL2SQL_CONFIG=path/to/your.yaml` 指定。
@@ -135,12 +158,13 @@ SQLGuard 六条规则（任一失败即拦截并给出中文原因）：
 ## 测试
 
 ```bash
-.venv/bin/pytest tests/ -v     # 53 个测试
+.venv/bin/pytest tests/ -v     # 75 个测试
 ```
 
 - `test_guard_security.py`：22 类恶意输入拦截 + 正常查询放行 + LIMIT 强制 + 白名单模式
 - `test_schema_and_executor.py`：Schema 双模式一致性、敏感表隐藏、只读连接拒写、截断
-- `test_generator_and_pipeline.py`：JSON 容错解析、自修复循环、修复产物重过守卫、重试封顶（FakeLLM，不联网）
+- `test_generator_and_pipeline.py`：JSON 容错解析、自修复循环、修复产物重过守卫、重试封顶、语义校验自愈 + 用尽降级警告 + LLM 审查触发重生成（FakeLLM，不联网）
+- `test_validator.py`：枚举注入（含时间戳/标识符排除）、确定性枚举校验（幻觉值拦截、别名/未限定列解析、歧义放过、IN 列表、误报防护）
 
 ## 项目结构
 
@@ -156,13 +180,14 @@ nl2sql-agent/
 │   ├── api/routes.py          # 两段式接口 + 导出
 │   ├── agent/
 │   │   ├── guard.py           # ★ AST 安全守卫（六条规则）
-│   │   ├── pipeline.py        # 编排：生成→守卫→执行→自修复
+│   │   ├── pipeline.py        # 编排：生成→守卫→语义校验→执行→自修复
 │   │   ├── generator.py       # NL → {sql, explanation, assumptions}
-│   │   ├── schema_provider.py # Schema 感知（自省/DDL 双模式）
+│   │   ├── validator.py       # ★ 语义校验：确定性枚举校验 + 可选 LLM 审查
+│   │   ├── schema_provider.py # Schema 感知（自省/DDL 双模式，含枚举注入）
 │   │   └── executor.py        # 只读执行器
 │   └── llm/client.py          # OpenAI 兼容客户端
 ├── web/index.html             # 结果展示页（静态单页，无构建步骤）
-├── tests/                     # 53 个测试
+├── tests/                     # 75 个测试
 └── docs/design.md             # 设计文档（架构/Agent 设计/关键取舍）
 ```
 

@@ -74,6 +74,10 @@ class SecurityConfig(BaseModel):
 class AgentConfig(BaseModel):
     max_repair_attempts: int = 2
     schema_linking: bool = False
+    enum_injection: bool = True          # Layer1：把低基数列的真实取值注入 Schema，喂给 LLM
+    enum_max_cardinality: int = 30       # 去重取值数 ≤ 此阈值的列才注入（滤掉自由文本/主键）
+    semantic_validation: bool = True     # Layer2a：确定性语义校验（枚举值是否合法）
+    llm_critic: bool = False             # Layer2b：额外的 LLM 审查 agent（默认关，按需开）
 
 
 class UIConfig(BaseModel):

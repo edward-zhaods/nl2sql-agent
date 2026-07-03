@@ -21,11 +21,12 @@ flowchart LR
     end
 
     subgraph Agent["Agent 核心（src/agent/）"]
-        SP[SchemaProvider<br/>DDL 文件 / 数据库自省]
+        SP[SchemaProvider<br/>DDL / 自省 + 低基数列枚举注入]
         GEN[SQLGenerator<br/>LLM 生成 SQL + 解释]
         GUARD[SQLGuard<br/>sqlglot AST 安全校验]
+        VALID[SemanticValidator<br/>枚举值语义校验 + 可选 LLM 审查]
         EXEC[Executor<br/>只读执行 / 超时 / 行数上限]
-        REPAIR[自修复循环<br/>报错回喂重试 ≤ N 次]
+        REPAIR[自修复循环<br/>报错 / 语义反馈回喂重试 ≤ N 次]
     end
 
     subgraph LLM["LLM（OpenAI 兼容）"]
@@ -41,10 +42,12 @@ flowchart LR
     GEN --> SP
     GEN --> NV
     GEN --> GUARD
+    GUARD --> VALID
     R2 --> GUARD
-    GUARD --> EXEC
+    VALID --> EXEC
     EXEC --> SQLITE
     EXEC -. 执行报错 .-> REPAIR
+    VALID -. 语义存疑 .-> REPAIR
     REPAIR --> GEN
     SP --> SQLITE
 ```
@@ -55,7 +58,7 @@ flowchart LR
 |---|---|---|
 | Web UI | `web/` | 纯静态单页（FastAPI 托管），提问、SQL 预览与确认、结果表格、CSV 导出 |
 | API | `src/api/` | HTTP 路由、请求校验、错误码规范 |
-| Agent 核心 | `src/agent/` | Schema 感知、SQL 生成、AST 安全守卫、受控执行、自修复 |
+| Agent 核心 | `src/agent/` | Schema 感知（含枚举注入）、SQL 生成、AST 安全守卫、语义校验、受控执行、自修复 |
 | LLM 接入 | `src/llm/` | OpenAI 兼容客户端封装（NVIDIA endpoint），模型/参数可配置 |
 | 配置 | `config/` | YAML 配置 + 环境变量（密钥只走环境变量） |
 
@@ -71,17 +74,24 @@ sequenceDiagram
     participant W as Web UI
     participant A as API
     participant G as SQLGuard
+    participant V as SemanticValidator
     participant L as LLM
     participant D as 数据库
 
     U->>W: 输入自然语言问题
     W->>A: POST /api/query/generate
-    A->>L: schema + 问题 + 方言 → 生成
+    A->>L: schema（含枚举取值）+ 问题 + 方言 → 生成
     L-->>A: SQL + 生成说明
-    A->>G: AST 校验（改写为规范化 SQL）
+    A->>G: AST 安全校验（改写为规范化 SQL）
     G-->>A: 通过 / 拦截（含原因）
-    A-->>W: {sql, explanation, guard_report}
-    Note over W: 展示 SQL 预览 + 解释，等待用户确认
+    A->>V: 语义校验（枚举值是否合法 + 可选 LLM 审查）
+    alt 语义存疑
+        V-->>A: 问题反馈
+        A->>L: 带反馈重新生成（≤ N 次，产物重过守卫+校验）
+    end
+    V-->>A: 通过 / 用尽重试则附警告
+    A-->>W: {sql, explanation, warnings, guard_report}
+    Note over W: 展示 SQL 预览 + 解释 + 步骤轨迹，等待用户确认
     U->>W: 点击「确认执行」
     W->>A: POST /api/query/execute {sql}
     A->>G: 再次完整校验（不信任客户端回传）
@@ -103,6 +113,8 @@ sequenceDiagram
 2. **数据库自省**：SQLAlchemy Inspector 拉取元数据（表、列、主外键、注释）。
 
 输出统一的 Schema Catalog（表 → 列 → 类型/注释），同时生成给 LLM 的紧凑文本表示。表数量多时只注入与问题相关的表（先用 LLM 做一轮表选择），避免上下文膨胀——demo 库表少，此路径默认关闭、可配置开启。
+
+**枚举注入（接地）**：自省时对低基数文本列采样真实取值写进 Schema 文本（如 `status TEXT -- 取值: paid, refunded`），让模型基于库里的实际枚举写 WHERE，而不是把中文描述（「已支付」）当字段值。时间戳/邮箱/编号类列按列名排除，不灌噪声。这份采样同时产出枚举目录，供 §3.7 的语义校验复用。见 `agent.enum_injection` / `enum_max_cardinality`。
 
 ### 3.2 SQL 生成（SQLGenerator）
 
@@ -138,7 +150,7 @@ sequenceDiagram
 
 ### 3.5 自修复循环
 
-执行失败（列名写错、方言函数不存在等）时，把**原问题 + 出错 SQL + 数据库报错**回喂给 LLM 重新生成，重试上限 `max_repair_attempts`（默认 2）。每次重试产物**重新过一遍守卫**——修复不能成为绕过安全校验的旁路。修复过程在 UI 上以步骤形式可见（体现 Agent 循环，也方便演示）。
+执行失败（列名写错、方言函数不存在等）时，把**原问题 + 出错 SQL + 数据库报错**回喂给 LLM 重新生成，重试上限 `max_repair_attempts`（默认 2）。每次重试产物**重新过一遍守卫**——修复不能成为绕过安全校验的旁路。§3.7 的语义校验失败也复用同一套「反馈回喂重生成」机制，一套循环同时处理「执行报错」与「语义不合法」。修复过程在 UI 上以步骤形式可见（体现 Agent 循环，也方便演示）。
 
 ### 3.6 安全模型总结：三层防御
 
@@ -147,6 +159,18 @@ sequenceDiagram
 第 2 层  SQLGuard AST 校验  （主防线，白名单思路：只放行已知安全的结构）
 第 3 层  只读连接 + 超时 + 行数上限（兜底：即使前两层全破，也写不了数据）
 ```
+
+### 3.7 正确性校验（SemanticValidator + SQLCritic）
+
+安全守卫只解决「能不能执行」，不解决「答得对不对」。像 `WHERE status = '已支付'`——语法合法、过守卫、能执行，却**静默返回 0 行**——这类语义错误单靠守卫和「执行报错才重试」都逮不住。生成后补一层正确性校验，与安全是**正交**的两个维度：
+
+| 层 | 机制 | 作用 |
+|---|---|---|
+| 防（接地） | Schema 枚举注入（§3.1） | 让模型看到列的真实取值，从源头减少幻觉 |
+| 校（确定性） | **SemanticValidator** | 遍历 AST，把 `col = 'x'` / `IN (...)` 的字面量比对封闭枚举集，逮住幻觉值。零 LLM 调用、可单测；只对小枚举（`enforce_max_cardinality`）强校验，开放型分类（城市、商品名）仅接地不强卡，避免误报 |
+| 校（可选） | **SQLCritic**（LLM 审查 agent） | 抓确定性规则抓不到的逻辑错（连错表、聚合口径、漏条件）。`agent.llm_critic` 开关，默认关；确定性校验先过才调用它（先便宜后昂贵） |
+
+发现问题后**复用 §3.5 自修复循环**把反馈回喂重生成，产物照样重过守卫。位置在 `generate_preview`（语义校验不需真执行，闭环在预览阶段完成，用户确认前看到的即已修正的 SQL）。用尽重试仍存疑则**不硬拦**（校验可能误报，且后有人工确认），降级为预览里的 ⚠️ 警告——安全拦截是终态，正确性存疑是提示，两者失败模式不同。
 
 ---
 
@@ -191,6 +215,10 @@ security:
 agent:
   max_repair_attempts: 2
   schema_linking: false            # 大库时开启：先选相关表再生成
+  enum_injection: true             # 低基数列真实取值注入 Schema（接地，防幻觉）
+  enum_max_cardinality: 30         # 去重取值 ≤ 此值的列才注入
+  semantic_validation: true        # 确定性枚举校验（§3.7）
+  llm_critic: false                # 额外 LLM 审查 agent，默认关
 
 ui:
   require_confirm_before_execute: true
@@ -214,16 +242,19 @@ nl2sql-agent/
 │   ├── config.py              # 配置加载与校验
 │   ├── api/                   # 路由层
 │   ├── agent/
-│   │   ├── schema_provider.py
+│   │   ├── schema_provider.py # 含低基数列枚举注入
 │   │   ├── generator.py
 │   │   ├── guard.py           # ★ AST 安全守卫
+│   │   ├── validator.py       # ★ 语义校验（确定性枚举 + 可选 LLM 审查）
 │   │   ├── executor.py
-│   │   └── pipeline.py        # 生成→校验→执行→修复 编排
+│   │   └── pipeline.py        # 生成→守卫→语义校验→执行→修复 编排
 │   └── llm/client.py
 ├── web/                       # 静态单页 UI
 ├── tests/
-│   ├── test_guard_security.py # ★ 恶意语句测试套件
-│   └── test_pipeline.py
+│   ├── test_guard_security.py       # ★ 恶意语句测试套件
+│   ├── test_schema_and_executor.py
+│   ├── test_generator_and_pipeline.py
+│   └── test_validator.py            # 枚举注入 + 语义校验
 └── docs/
     └── design.md
 ```
@@ -244,6 +275,8 @@ nl2sql-agent/
 | LLM 温度 | 0.2 | 高温度——SQL 生成要求确定性，创造性是负资产 |
 | 前端 | 静态单页（无构建步骤） | React/Vue 工程——评审可 `pip install` 后直接跑，不需要 Node 环境 |
 | 自修复 | 报错回喂重试 ≤2 次，每次重过守卫 | 无限重试——成本失控；跳过守卫的重试——安全旁路 |
+| 枚举正确性 | Schema 注入真实取值接地 + AST 确定性枚举校验 | 在 prompt 里硬编状态映射——易过期、且被模型无视；只靠 LLM 自觉——幻觉不可控 |
+| 语义存疑处理 | 回喂重生成，用尽则降级为警告 | 硬拦截——确定性校验可能误报，叠加人工确认后硬拦是过度防御 |
 
 ---
 
@@ -261,3 +294,4 @@ nl2sql-agent/
 | 可配置项 | `config/example.yaml`（§5，字段说明见 README） |
 | 3 个示例问题 + 参考答案 | README（聚合 / JOIN / 时间范围），演示库按此设计 |
 | 恶意语句明确提示 | Guard 拦截返回具体规则与原因，UI 红色横幅展示 |
+| （增强）枚举幻觉纠错 | `agent/validator.py` 语义校验 + Schema 枚举注入（§3.7），`tests/test_validator.py` |
