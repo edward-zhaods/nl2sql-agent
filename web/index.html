@@ -8,8 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  /* 设计系统：Developer Tool / IDE 暗色主题（源自 ui-ux-pro-max skill）
-     配色 slate + indigo，字体 Inter + JetBrains Mono */
+  /* 设计系统：淡绿色浅色主题，字体 Inter + JetBrains Mono */
   :root {
     --primary: #16A34A;
     --primary-2: #15803D;
@@ -171,7 +170,7 @@
   button.confirm { background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
                    box-shadow: 0 6px 18px -5px rgba(16,185,129,.5); }
   button.secondary { background: var(--card-2); color: var(--fg-2); border: 1px solid var(--border); }
-  button.secondary:hover { background: #31425a; }
+  button.secondary:hover { background: var(--card-2); border-color: var(--primary); }
   button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
   button svg { width: 15px; height: 15px; }
   button.loading { opacity: .9; pointer-events: none; }
@@ -313,7 +312,7 @@
     <div class="card hidden" id="result-card">
       <h3>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg>
-        查询结果
+        <span id="result-title">查询结果</span>
       </h3>
       <div id="result-body"></div>
     </div>
@@ -324,6 +323,7 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let current = { sql: "", question: "" };
+let requireConfirm = true;   // ui.require_confirm_before_execute（题目硬性要求，默认开启；初始化时从 /api/config 读取）
 
 async function api(path, body) {
   const resp = await fetch("/api" + path, body === undefined ? {} : {
@@ -349,6 +349,7 @@ function renderSteps(steps) {
 (async () => {
   try {
     const cfg = await (await api("/config")).json();
+    requireConfirm = cfg.require_confirm_before_execute !== false;
     $("cfg-meta").innerHTML = [
       `模型 ${esc(cfg.model)}`,
       `${esc(cfg.database_type)}`,
@@ -364,16 +365,18 @@ function renderSteps(steps) {
   } catch (e) { $("cfg-meta").innerHTML = `<span class="pill">初始化失败：${esc(e.message)}</span>`; }
 })();
 
-// ---------------- 一键查询：生成 → 安全校验 → 直接执行 ----------------
+// ---------------- 查询流程：生成 → 安全校验 → SQL 预览确认 → 执行 ----------------
+// require_confirm_before_execute=true（默认）：先展示 SQL 预览，用户点「确认执行」后才执行（题目硬性要求）
+// require_confirm_before_execute=false：生成通过校验后直接执行
 const btnQuery = $("btn-query");
 const btnQueryHTML = btnQuery.innerHTML;
 
-function setLoading(on) {
+function setLoading(on, label) {
   btnQuery.disabled = on;
   $("question").disabled = on;
   btnQuery.classList.toggle("loading", on);
   btnQuery.innerHTML = on
-    ? '<span class="btn-spin"></span><span class="btn-label">查询中…</span>'
+    ? `<span class="btn-spin"></span><span class="btn-label">${label || "查询中…"}</span>`
     : btnQueryHTML;
 }
 
@@ -381,11 +384,12 @@ btnQuery.onclick = () => runQuery($("question").value.trim());
 
 async function runQuery(question) {
   if (!question) return alert("请先输入问题");
-  setLoading(true);
+  setLoading(true, "生成中…");
   $("result-card").classList.remove("hidden");
-  $("result-body").innerHTML = '<span class="spinner">正在生成 SQL 并查询…（失败时 Agent 会自动尝试修复）</span>';
+  $("result-title").textContent = "查询结果";
+  $("result-body").innerHTML = '<span class="spinner">正在生成 SQL…</span>';
   try {
-    // 生成 SQL + 安全校验（服务端）
+    // 第一段：生成 SQL + 服务端安全校验（不执行）
     const preview = await (await api("/query/generate", { question })).json();
     if (!preview.ok) {
       $("result-body").innerHTML =
@@ -394,40 +398,77 @@ async function runQuery(question) {
         renderSteps(preview.steps);
       return;
     }
-    // 直接执行（服务端会再次完整安全校验）
-    const outcome = await (await api("/query/execute", { sql: preview.sql, question })).json();
-    if (!outcome.success) {
-      $("result-body").innerHTML =
-        `<pre class="sql">${esc(outcome.sql)}</pre>` +
-        `<div class="banner"><div class="body"><b>执行失败${outcome.error?.startsWith("[R") ? "：已被安全守卫拦截" : ""}</b>${esc(outcome.error)}</div></div>` +
-        renderSteps(outcome.steps);
-      return;
+    if (requireConfirm) {
+      renderPreview(preview, question);   // SQL 预览 + 确认执行按钮
+    } else {
+      await executeSql(preview, question);
     }
-    const r = outcome.result;
-    current = { sql: outcome.sql, question };   // 实际执行的 SQL（自修复后以此为准，供导出）
-    $("result-body").innerHTML =
-      `<pre class="sql">${esc(outcome.sql)}</pre>` +
-      `<p class="explain">💡 ${esc(preview.explanation)}</p>` +
-      (preview.assumptions?.length ? `<p class="explain">假设：${esc(preview.assumptions.join("；"))}</p>` : "") +
-      `<div class="result-meta" style="margin-top:12px">
-         <span class="count">${r.row_count} 行</span><span>· ${r.elapsed_ms}ms</span>
-         ${r.truncated ? '<span class="badge">结果已按上限截断</span>' : ""}
-         ${outcome.repaired ? `<span class="badge repair">经 ${outcome.attempts} 次自修复</span>` : ""}
-         <button class="secondary" id="btn-export" style="margin-left:auto;padding:6px 13px;font-size:12.5px">
-           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-           导出 CSV</button>
-       </div>` +
-      renderSteps(outcome.steps) +
-      `<div class="table-wrap"><table>
-         <thead><tr>${r.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead>
-         <tbody>${r.rows.map((row) => `<tr>${row.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody>
-       </table></div>`;
-    $("btn-export").onclick = exportCsv;
   } catch (e) {
     $("result-body").innerHTML = `<div class="banner"><div class="body"><b>请求失败</b>${esc(e.message)}</div></div>`;
   } finally {
     setLoading(false);
   }
+}
+
+function renderPreview(preview, question) {
+  $("result-title").textContent = "SQL 预览（确认后执行）";
+  $("result-body").innerHTML =
+    `<pre class="sql">${esc(preview.sql)}</pre>` +
+    `<p class="explain">💡 ${esc(preview.explanation)}</p>` +
+    (preview.assumptions?.length ? `<p class="explain">假设：${esc(preview.assumptions.join("；"))}</p>` : "") +
+    renderSteps(preview.steps) +
+    `<div class="row" style="justify-content:flex-end">
+       <button class="secondary" id="btn-cancel">取消</button>
+       <button class="confirm" id="btn-confirm">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+         确认执行</button>
+     </div>`;
+  $("btn-cancel").onclick = () => $("result-card").classList.add("hidden");
+  $("btn-confirm").onclick = async () => {
+    $("btn-confirm").disabled = $("btn-cancel").disabled = true;
+    setLoading(true, "执行中…");
+    try {
+      await executeSql(preview, question);
+    } catch (e) {
+      $("result-body").innerHTML = `<div class="banner"><div class="body"><b>请求失败</b>${esc(e.message)}</div></div>`;
+    } finally {
+      setLoading(false);
+    }
+  };
+}
+
+async function executeSql(preview, question) {
+  $("result-title").textContent = "查询结果";
+  $("result-body").innerHTML = '<span class="spinner">正在执行查询…（失败时 Agent 会自动尝试修复）</span>';
+  // 服务端会对回传 SQL 再次完整安全校验
+  const outcome = await (await api("/query/execute", { sql: preview.sql, question })).json();
+  if (!outcome.success) {
+    $("result-body").innerHTML =
+      `<pre class="sql">${esc(outcome.sql)}</pre>` +
+      `<div class="banner"><div class="body"><b>执行失败${outcome.error?.startsWith("[R") ? "：已被安全守卫拦截" : ""}</b>${esc(outcome.error)}</div></div>` +
+      renderSteps(outcome.steps);
+    return;
+  }
+  const r = outcome.result;
+  current = { sql: outcome.sql, question };   // 实际执行的 SQL（自修复后以此为准，供导出）
+  $("result-body").innerHTML =
+    `<pre class="sql">${esc(outcome.sql)}</pre>` +
+    `<p class="explain">💡 ${esc(preview.explanation)}</p>` +
+    (preview.assumptions?.length ? `<p class="explain">假设：${esc(preview.assumptions.join("；"))}</p>` : "") +
+    `<div class="result-meta" style="margin-top:12px">
+       <span class="count">${r.row_count} 行</span><span>· ${r.elapsed_ms}ms</span>
+       ${r.truncated ? '<span class="badge">结果已按上限截断</span>' : ""}
+       ${outcome.repaired ? `<span class="badge repair">经 ${outcome.attempts} 次自修复</span>` : ""}
+       <button class="secondary" id="btn-export" style="margin-left:auto;padding:6px 13px;font-size:12.5px">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+         导出 CSV</button>
+     </div>` +
+    renderSteps(outcome.steps) +
+    `<div class="table-wrap"><table>
+       <thead><tr>${r.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+       <tbody>${r.rows.map((row) => `<tr>${row.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody>
+     </table></div>`;
+  $("btn-export").onclick = exportCsv;
 }
 
 async function exportCsv() {
@@ -456,6 +497,7 @@ async function attackDemo() {
   const note = `<p class="explain">演示：绕过「查询」流程，直接向 <code>/api/query/execute</code> 发送 <code>SELECT 1; DROP TABLE users</code>（等同攻击者手工调接口）</p>`;
   setLoading(true);
   $("result-card").classList.remove("hidden");
+  $("result-title").textContent = "查询结果";
   $("result-body").innerHTML = note + '<span class="spinner">执行中…</span>';
   try {
     const outcome = await (await api("/query/execute", { sql: "SELECT 1; DROP TABLE users" })).json();
