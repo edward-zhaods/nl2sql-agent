@@ -110,7 +110,7 @@ SQLGuard 六条规则（任一失败即拦截并给出中文原因）：
 | 字段 | 说明 | 默认 |
 |---|---|---|
 | `llm.base_url` | OpenAI 兼容接口地址 | NVIDIA API Catalog |
-| `llm.model` | 模型 ID | `deepseek-ai/deepseek-v4-flash` |
+| `llm.model` | 模型 ID | `z-ai/glm-5.2` |
 | `llm.api_key_env` | 密钥所在**环境变量名**（配置文件不落明文） | `NVIDIA_API_KEY` |
 | `llm.temperature` | 生成温度（SQL 要求稳定，宜低） | `0.2` |
 | `database.type` | `sqlite` / `mysql` / `postgresql` | `sqlite` |
@@ -130,7 +130,7 @@ SQLGuard 六条规则（任一失败即拦截并给出中文原因）：
 自定义配置：复制 `config/example.yaml` 后修改，用环境变量 `NL2SQL_CONFIG=path/to/your.yaml` 指定。
 
 **切换数据库**：`database.type` 改为 `mysql`/`postgresql` 并配置 `database.url`（连接账号请只授予 SELECT 权限，这是第三层防御的前提）。
-**切换模型**：改 `llm.model` 一行即可（如 `deepseek-ai/deepseek-v4-pro`、`qwen/qwen3.5-397b-a17b`）；任何 OpenAI 兼容供应商改 `base_url` + `model`。
+**切换模型**：改 `llm.model` 一行即可（如 `stepfun-ai/step-3.7-flash`、`deepseek-ai/deepseek-v4-flash`、`mistralai/mistral-medium-3.5-128b`）；任何 OpenAI 兼容供应商改 `base_url` + `model`。
 
 ## 测试
 
@@ -179,7 +179,7 @@ nl2sql-agent/
 
 ## 已知限制
 
-- NVIDIA API Catalog 免费接口延迟波动较大（实测 5～45 秒）；
+- NVIDIA API Catalog 免费接口延迟波动较大；若生成 SQL 慢，可优先切换 `llm.model` 为其他 Free Endpoint；
 - SQLite 无服务端语句超时（依赖 LIMIT clamp + 只读兜底）；MySQL 的会话超时需在连接串/账号侧配置；
 - 多轮追问澄清暂未实现（设计文档中已列为可扩展点）。
 
