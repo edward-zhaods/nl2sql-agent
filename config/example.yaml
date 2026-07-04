@@ -2,9 +2,14 @@
 # 各字段说明见 README「配置说明」章节
 
 llm:
+  # 使用 OpenAI Python SDK 的 OpenAI-compatible 接口。
+  # 默认接 NVIDIA API Catalog；如需切到 OpenAI 官方，改为：
+  #   base_url: "https://api.openai.com/v1"
+  #   model: "gpt-4o-mini"
+  #   api_key_env: "OPENAI_API_KEY"
   base_url: "https://integrate.api.nvidia.com/v1"
   model: "z-ai/glm-5.2"                    # 备选：stepfun-ai/step-3.7-flash、deepseek-ai/deepseek-v4-flash、mistralai/mistral-medium-3.5-128b
-  api_key_env: "NVIDIA_API_KEY"    # 只存环境变量名，密钥本体放 .env
+  api_key_env: "NVIDIA_API_KEY"    # 只存环境变量名，密钥本体放 .env；OpenAI 官方可改为 OPENAI_API_KEY
   temperature: 0.2
   max_tokens: 2048
 
