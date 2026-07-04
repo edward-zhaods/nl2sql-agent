@@ -153,7 +153,7 @@ SQLGuard 六条规则（任一失败即拦截并给出中文原因）：
 自定义配置：复制 `config/example.yaml` 后修改，用环境变量 `NL2SQL_CONFIG=path/to/your.yaml` 指定。
 
 **切换数据库**：`database.type` 改为 `mysql`/`postgresql` 并配置 `database.url`（连接账号请只授予 SELECT 权限，这是第三层防御的前提）。
-**切换模型**：改 `llm.model` 一行即可（如 `stepfun-ai/step-3.7-flash`、`deepseek-ai/deepseek-v4-flash`、`mistralai/mistral-medium-3.5-128b`）；任何 OpenAI 兼容供应商改 `base_url` + `model`。
+**切换模型/供应商**：本项目使用 OpenAI Python SDK 的 OpenAI-compatible 接口。默认接 NVIDIA API Catalog；如果使用 OpenAI 官方接口，把 `llm.base_url` 改为 `https://api.openai.com/v1`、`llm.model` 改为如 `gpt-4o-mini`，并把 `llm.api_key_env` 改为 `OPENAI_API_KEY`。其他 OpenAI 兼容供应商同理改 `base_url` + `model`。
 
 ## 测试
 
@@ -210,4 +210,4 @@ nl2sql-agent/
 
 ---
 
-设计文档：[docs/design.md](docs/design.md) · 演示脚本：[docs/demo-script.md](docs/demo-script.md)
+设计文档：[docs/design.md](docs/design.md)
