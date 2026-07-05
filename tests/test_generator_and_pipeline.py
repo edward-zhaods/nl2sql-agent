@@ -78,9 +78,21 @@ def test_system_prompt_defers_enum_values_to_schema():
     gen = SQLGenerator(llm, "sqlite")
     gen.generate("已支付订单", "schema")
     system_msg = llm.calls[0][0]["content"]
-    assert "不要把用户问题中的中文描述" in system_msg
+    assert "不要把用户问题中的自然语言描述" in system_msg
     assert "取值:" in system_msg                 # 指向 Schema 里的真实枚举标注
     assert "已支付" in system_msg                 # 点名这个典型幻觉
+
+
+def test_system_prompt_explicitly_supports_english_questions():
+    llm = FakeLLM([reply("SELECT 1")])
+    gen = SQLGenerator(llm, "sqlite")
+    gen.generate("Top 5 products by sales among paid orders", "schema")
+    system_msg = llm.calls[0][0]["content"]
+    user_msg = llm.calls[0][-1]["content"]
+    assert "中文或英文" in system_msg
+    assert "last N days" in system_msg
+    assert "英文表名、列名和真实枚举值" in system_msg
+    assert "Top 5 products by sales among paid orders" in user_msg
 
 
 # ---------------------------------------------------------------- Pipeline
